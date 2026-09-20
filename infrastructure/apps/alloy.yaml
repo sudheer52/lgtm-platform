@@ -10,6 +10,21 @@ spec:
     chart: alloy
     targetRevision: 0.6.0
     helm:
+      parameters:
+        - name: alloy.controller.type
+          value: daemonset
+        - name: alloy.mounts.varlog
+          value: "true"
+        - name: alloy.mounts.dockercontainers
+          value: "true"
+        - name: alloy.resources.requests.memory
+          value: 256Mi
+        - name: alloy.resources.requests.cpu
+          value: 100m
+        - name: alloy.resources.limits.memory
+          value: 512Mi
+        - name: alloy.resources.limits.cpu
+          value: 200m
       values: |
         alloy:
           configMap:
@@ -66,15 +81,12 @@ spec:
                   tls { insecure = true }
                 }
               }
-          controller:
-            type: daemonset
-          mounts:
-            varlog: true
-            dockercontainers: true
-          resources:
-            requests:
-              memory: 256Mi
-              cpu: 100m
-            limits:
-              memory: 512Mi
-              cpu: 200m
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
