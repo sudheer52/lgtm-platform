@@ -14,17 +14,54 @@ spec:
         alloy:
           configMap:
             content: |
-              loki.source.file "varlog" {
-                targets = [
-                  {__path__ = "/var/log/containers/*.log", job = "k8s-containers"},
-                ]
+              // Discover kubernetes pods
+              discovery.kubernetes "pods" {
+                role = "pod"
+              }
+
+              // Relabel pod logs to get useful labels
+              discovery.relabel "pod_logs" {
+                targets = discovery.kubernetes.pods.targets
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace"]
+                  target_label  = "namespace"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_name"]
+                  target_label  = "pod"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_container_name"]
+                  target_label  = "container"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
+                  separator     = "/"
+                  target_label  = "job"
+                }
+                rule {
+                  source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
+                  separator     = "/"
+                  action        = "replace"
+                  replacement   = "/var/log/pods/*$1/*.log"
+                  target_label  = "__path__"
+                }
+              }
+
+              // Collect logs from pods
+              loki.source.file "pod_logs" {
+                targets    = discovery.relabel.pod_logs.output
                 forward_to = [loki.write.default.receiver]
               }
+
+              // Write to Loki
               loki.write "default" {
                 endpoint {
                   url = "http://loki:3100/loki/api/v1/push"
                 }
               }
+
+              // OTLP receiver for traces
               otelcol.receiver.otlp "default" {
                 grpc { endpoint = "0.0.0.0:4317" }
                 http { endpoint = "0.0.0.0:4318" }
@@ -32,26 +69,21 @@ spec:
                   traces = [otelcol.exporter.otlp.tempo.input]
                 }
               }
+
+              // Export traces to Tempo
               otelcol.exporter.otlp "tempo" {
                 client {
                   endpoint = "http://tempo:4317"
                   tls { insecure = true }
                 }
               }
-              prometheus.scrape "alloy_self" {
-                targets = [{"__address__" = "localhost:12345"}]
-                forward_to = [prometheus.remote_write.mimir.receiver]
-              }
-              prometheus.remote_write "mimir" {
-                endpoint {
-                  url = "http://mimir-nginx:80/api/v1/push"
-                }
-              }
+
           controller:
             type: daemonset
           mounts:
             varlog: true
             dockercontainers: true
+
         resources:
           requests:
             memory: 256Mi
@@ -59,12 +91,3 @@ spec:
           limits:
             memory: 512Mi
             cpu: 200m
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
