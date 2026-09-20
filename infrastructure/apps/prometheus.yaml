@@ -10,8 +10,42 @@ spec:
     chart: kube-prometheus-stack
     targetRevision: 61.1.0
     helm:
-      valueFiles:
-        - values.yaml
+      values: |
+        grafana:
+          enabled: true
+          adminPassword: admin
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              url: http://loki:3100
+              access: proxy
+              isDefault: false
+            - name: Tempo
+              type: tempo
+              url: http://tempo:3100
+              access: proxy
+            - name: Mimir
+              type: prometheus
+              url: http://mimir-nginx:80/prometheus
+              access: proxy
+        prometheus:
+          prometheusSpec:
+            remoteWrite:
+              - url: http://mimir-nginx:80/api/v1/push
+            retention: 2h
+            resources:
+              requests:
+                memory: 512Mi
+                cpu: 250m
+              limits:
+                memory: 1Gi
+                cpu: 500m
+        alertmanager:
+          enabled: true
+        nodeExporter:
+          enabled: true
+        kubeStateMetrics:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

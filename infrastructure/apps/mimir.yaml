@@ -10,8 +10,43 @@ spec:
     chart: mimir-distributed
     targetRevision: 5.4.0
     helm:
-      valueFiles:
-        - values.yaml
+      values: |
+        mimir:
+          structuredConfig:
+            common:
+              storage:
+                backend: filesystem
+                filesystem:
+                  dir: /data/mimir
+            blocks_storage:
+              filesystem:
+                dir: /data/mimir/blocks
+            compactor:
+              data_dir: /data/mimir/compactor
+            ingester:
+              ring:
+                replication_factor: 1
+            store_gateway:
+              sharding_ring:
+                replication_factor: 1
+        minio:
+          enabled: false
+        ingester:
+          replicas: 1
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 250m
+        distributor:
+          replicas: 1
+        querier:
+          replicas: 1
+        query_frontend:
+          replicas: 1
+        store_gateway:
+          replicas: 1
+        compactor:
+          replicas: 1
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

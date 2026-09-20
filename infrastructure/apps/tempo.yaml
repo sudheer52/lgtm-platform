@@ -10,8 +10,27 @@ spec:
     chart: tempo
     targetRevision: 1.10.1
     helm:
-      valueFiles:
-        - values.yaml
+      values: |
+        tempo:
+          storage:
+            trace:
+              backend: local
+              local:
+                path: /var/tempo/traces
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                http:
+                  endpoint: 0.0.0.0:4318
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 200m
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
