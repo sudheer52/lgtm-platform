@@ -11,76 +11,18 @@ spec:
     targetRevision: 0.6.0
     helm:
       parameters:
+        - name: alloy.configMap.create
+          value: "false"
+        - name: alloy.configMap.name
+          value: alloy
+        - name: alloy.configMap.key
+          value: config.alloy
         - name: alloy.controller.type
           value: daemonset
         - name: alloy.mounts.varlog
           value: "true"
         - name: alloy.mounts.dockercontainers
           value: "true"
-        - name: alloy.resources.requests.memory
-          value: 256Mi
-        - name: alloy.resources.requests.cpu
-          value: 100m
-        - name: alloy.resources.limits.memory
-          value: 512Mi
-        - name: alloy.resources.limits.cpu
-          value: 200m
-      values: |
-        alloy:
-          configMap:
-            content: |
-              discovery.kubernetes "pods" {
-                role = "pod"
-              }
-              discovery.relabel "pod_logs" {
-                targets = discovery.kubernetes.pods.targets
-                rule {
-                  source_labels = ["__meta_kubernetes_namespace"]
-                  target_label  = "namespace"
-                }
-                rule {
-                  source_labels = ["__meta_kubernetes_pod_name"]
-                  target_label  = "pod"
-                }
-                rule {
-                  source_labels = ["__meta_kubernetes_pod_container_name"]
-                  target_label  = "container"
-                }
-                rule {
-                  source_labels = ["__meta_kubernetes_namespace", "__meta_kubernetes_pod_name"]
-                  separator     = "/"
-                  target_label  = "job"
-                }
-                rule {
-                  source_labels = ["__meta_kubernetes_pod_uid", "__meta_kubernetes_pod_container_name"]
-                  separator     = "/"
-                  action        = "replace"
-                  replacement   = "/var/log/pods/*$1/*.log"
-                  target_label  = "__path__"
-                }
-              }
-              loki.source.file "pod_logs" {
-                targets    = discovery.relabel.pod_logs.output
-                forward_to = [loki.write.default.receiver]
-              }
-              loki.write "default" {
-                endpoint {
-                  url = "http://loki:3100/loki/api/v1/push"
-                }
-              }
-              otelcol.receiver.otlp "default" {
-                grpc { endpoint = "0.0.0.0:4317" }
-                http { endpoint = "0.0.0.0:4318" }
-                output {
-                  traces = [otelcol.exporter.otlp.tempo.input]
-                }
-              }
-              otelcol.exporter.otlp "tempo" {
-                client {
-                  endpoint = "http://tempo:4317"
-                  tls { insecure = true }
-                }
-              }
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
