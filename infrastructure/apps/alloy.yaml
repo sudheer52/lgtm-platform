@@ -14,12 +14,9 @@ spec:
         alloy:
           configMap:
             content: |
-              // Discover kubernetes pods
               discovery.kubernetes "pods" {
                 role = "pod"
               }
-
-              // Relabel pod logs to get useful labels
               discovery.relabel "pod_logs" {
                 targets = discovery.kubernetes.pods.targets
                 rule {
@@ -47,21 +44,15 @@ spec:
                   target_label  = "__path__"
                 }
               }
-
-              // Collect logs from pods
               loki.source.file "pod_logs" {
                 targets    = discovery.relabel.pod_logs.output
                 forward_to = [loki.write.default.receiver]
               }
-
-              // Write to Loki
               loki.write "default" {
                 endpoint {
                   url = "http://loki:3100/loki/api/v1/push"
                 }
               }
-
-              // OTLP receiver for traces
               otelcol.receiver.otlp "default" {
                 grpc { endpoint = "0.0.0.0:4317" }
                 http { endpoint = "0.0.0.0:4318" }
@@ -69,25 +60,21 @@ spec:
                   traces = [otelcol.exporter.otlp.tempo.input]
                 }
               }
-
-              // Export traces to Tempo
               otelcol.exporter.otlp "tempo" {
                 client {
                   endpoint = "http://tempo:4317"
                   tls { insecure = true }
                 }
               }
-
           controller:
             type: daemonset
           mounts:
             varlog: true
             dockercontainers: true
-
-        resources:
-          requests:
-            memory: 256Mi
-            cpu: 100m
-          limits:
-            memory: 512Mi
-            cpu: 200m
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 200m
