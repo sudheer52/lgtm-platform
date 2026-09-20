@@ -1,0 +1,59 @@
+alloy:
+  configMap:
+    content: |
+      // ============ LOGS ============
+      loki.source.file "varlog" {
+        targets = [
+          {__path__ = "/var/log/containers/*.log", job = "k8s-containers"},
+        ]
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki:3100/loki/api/v1/push"
+        }
+      }
+
+      // ============ TRACES ============
+      otelcol.receiver.otlp "default" {
+        grpc { endpoint = "0.0.0.0:4317" }
+        http { endpoint = "0.0.0.0:4318" }
+        output {
+          traces = [otelcol.exporter.otlp.tempo.input]
+        }
+      }
+
+      otelcol.exporter.otlp "tempo" {
+        client {
+          endpoint = "http://tempo:4317"
+          tls { insecure = true }
+        }
+      }
+
+      // ============ METRICS ============
+      prometheus.scrape "alloy_self" {
+        targets = [{"__address__" = "localhost:12345"}]
+        forward_to = [prometheus.remote_write.mimir.receiver]
+      }
+
+      prometheus.remote_write "mimir" {
+        endpoint {
+          url = "http://mimir-nginx:80/api/v1/push"
+        }
+      }
+
+  controller:
+    type: daemonset
+
+  mounts:
+    varlog: true
+    dockercontainers: true
+
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 200m

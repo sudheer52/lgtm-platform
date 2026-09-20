@@ -1,0 +1,50 @@
+grafana:
+  enabled: true
+  adminPassword: admin
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki:3100
+      access: proxy
+      isDefault: false
+    - name: Tempo
+      type: tempo
+      url: http://tempo:3100
+      access: proxy
+    - name: Mimir
+      type: prometheus
+      url: http://mimir-nginx:80/prometheus
+      access: proxy
+
+prometheus:
+  prometheusSpec:
+    remoteWrite:
+      - url: http://mimir-nginx:80/api/v1/push
+    retention: 2h
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 250m
+      limits:
+        memory: 1Gi
+        cpu: 500m
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'null'
+    receivers:
+      - name: 'null'
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true

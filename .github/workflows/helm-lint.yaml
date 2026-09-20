@@ -1,0 +1,31 @@
+name: Helm Lint
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+
+      - name: Add Helm repos
+        run: |
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Lint Prometheus
+        run: helm lint infrastructure/prometheus --values infrastructure/prometheus/values.yaml
+
+      - name: Lint Loki
+        run: helm lint infrastructure/loki --values infrastructure/loki/values.yaml
+
+      - name: Lint Tempo
+        run: helm lint infrastructure/tempo --values infrastructure/tempo/values.yaml
